@@ -27,6 +27,11 @@ int checkFileType(char *path) {
 }
 
 int verifyInput(char *params, int type) {
+    if(params[0] != '-') {
+        printf("\nThe command must start with an '-'\n");
+        return -1;
+    }
+
     //printf("p: %s\n", params);
     int not = 0;
 
@@ -87,8 +92,8 @@ void handleSym(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
-    if(verifyInput(params, 1)) {
-        for(int i = 1; i < strlen(params)-1; i++) {
+    if(verifyInput(params, 1) != -1) {
+        for(int i = 1; i < strlen(params)-1 && deleted == 0; i++) {
             if (params[i] == 'n') {
                 printf("Name: %s\n", path);
                 printf("\n");
@@ -102,7 +107,7 @@ void handleSym(char *path) {
                     printf("\n");
                 }
             }
-            if (params[i] == 'd') {
+            if (params[i] == 't') {
                 if(stat(path, &buf)) {
                     printf("error\n");
                 }
@@ -118,19 +123,11 @@ void handleSym(char *path) {
                 else {
                     if(unlink(path) == 0) {
                         printf("Symlink deleted successfully.\n");
+                        deleted = 1;
                     }
                     else {
                         printf("Error deleting the symlink.\n");
                     }
-                    printf("\n");
-                }
-            }
-            if (params[i] == 'm') {
-                if(lstat(path, &buf)) {
-                    printf("error\n");
-                }
-                else {
-                    printf("Time of last modification: %ld\n", buf.st_mtime);
                     printf("\n");
                 }
             }
@@ -156,26 +153,6 @@ void handleSym(char *path) {
                     buf.st_mode & S_IWOTH ? printf("   Write - yes\n") : printf("   Write - no\n");
                     buf.st_mode & S_IXOTH ? printf("   Execute - yes\n") : printf("   Execute - no\n");
 
-                    printf("\n");
-                }
-            }
-
-            if (params[i] == 'l') {
-                char link[15];
-
-                printf("Enter name of symlink: ");
-                fgets(link, 15, stdin);
-
-                if(stat(path, &buf)) {
-                    printf("error\n");
-                }
-                else {
-                    if(symlink(path, link) == 0) {
-                        printf("Success!");
-                    }
-                    else {
-                        printf("It didn't work.");
-                    }
                     printf("\n");
                 }
             }
@@ -208,7 +185,7 @@ void handleRegular(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
-    if(verifyInput(params, 0)) {
+    if(verifyInput(params, 0) != -1) {
         for(int i = 1; i < strlen(params)-1; i++) {
             if (params[i] == 'n') {
                 printf("Name: %s\n", path);
@@ -273,12 +250,22 @@ void handleRegular(char *path) {
                 printf("Enter name of symlink: ");
                 fgets(link, 15, stdin);
 
+                //remove the null character at the end if present
+                char *newline = strchr(link, '\n');
+                if (newline != NULL) {
+                    *newline = '\0';
+                }
+
                 if(stat(path, &buf)) {
                     printf("error\n");
                 }
                 else {
                     if(symlink(path, link) == 0) {
-                        printf("Success!");
+                        printf("Success! You created a symbolic link: %s\n", link);
+                        printf("Here's how it looks:\n");
+                        char command[256];
+                        sprintf(command, "ls -l %s", link);
+                        system(command);
                     }
                     else {
                         printf("It didn't work.");
