@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <dirent.h>
 
 int checkFileType(char *path) {
     struct stat buf;
@@ -41,6 +42,22 @@ int verifyInput(char *params, int type) {
         for(int i = 1; i < strlen(params)-1; i++) {
             //printf("- %c\n", params[i]);
             if(params[i] == 'n' || params[i] == 'd' || params[i] == 'h' || params[i] == 'm' || params[i] == 'a' || params[i] == 'l') {
+                //
+            }
+            else {
+                not = 1;
+            }
+        }
+
+        if(not) 
+            return 0;
+        else
+            return 1;
+    }
+    else if(type == 2) {
+        for(int i = 1; i < strlen(params)-1; i++) {
+            //printf("- %c\n", params[i]);
+            if(params[i] == 'n' || params[i] == 'd' || params[i] == 'a' || params[i] == 'c') {
                 //
             }
             else {
@@ -282,6 +299,119 @@ void handleRegular(char *path) {
     printf("\n\n-----------------------------------------------\n\n");
 }
 
+void handleDirectory(char *path) {
+    char params[10];
+
+    struct stat buf;
+    
+    printf("---- MENU ----\n");
+    printf("* n: name of directory\n");
+    printf("* d: size of directory\n");
+    printf("* a: access rights\n");
+    printf("* c: number of files with the .c extension\n");
+    printf("\n---- EXAMPLE INPUT ----\n");
+    printf("-nd\n");
+    printf("Used for displaying the name of directory and the size of the directory\n");
+
+    printf("\n\nPlease enter your options\n\n");
+    printf("STANDARD INPUT: ");
+    fgets(params, 10, stdin);
+
+    if(verifyInput(params, 2) != -1) {
+        for(int i = 1; i < strlen(params)-1; i++) {
+            if (params[i] == 'n') {
+                printf("Name: %s\n", path);
+                printf("\n");
+            }
+            if (params[i] == 'd') {
+                if(stat(path, &buf)) {
+                    printf("error\n");
+                }
+                else {
+                    printf("Size: %d bytes\n", (int)buf.st_size);
+                    printf("\n");
+                }
+            }
+            if (params[i] == 'a') {
+                if(stat(path, &buf)) {
+                    printf("error\n");
+                }
+                else {
+                    printf("Access rights: \n");
+
+                    printf("User:\n");
+                    buf.st_mode & S_IRUSR ? printf("   Read - yes\n") : printf("   Read - no\n");
+                    buf.st_mode & S_IWUSR ? printf("   Write - yes\n") : printf("   Write - no\n");
+                    buf.st_mode & S_IXUSR ? printf("   Execute - yes\n") : printf("   Execute - no\n");
+                        
+                    printf("Group:\n");
+                    buf.st_mode & S_IRGRP ? printf("   Read - yes\n") : printf("   Read - no\n");
+                    buf.st_mode & S_IWGRP ? printf("   Write - yes\n") : printf("   Write - no\n");
+                    buf.st_mode & S_IXGRP ? printf("   Execute - yes\n") : printf("   Execute - no\n");
+
+                    printf("Other:\n");
+                    buf.st_mode & S_IROTH ? printf("   Read - yes\n") : printf("   Read - no\n");
+                    buf.st_mode & S_IWOTH ? printf("   Write - yes\n") : printf("   Write - no\n");
+                    buf.st_mode & S_IXOTH ? printf("   Execute - yes\n") : printf("   Execute - no\n");
+
+                    printf("\n");
+                }
+            }
+
+            if (params[i] == 'c') {
+                
+                DIR *dir;
+                struct dirent *ent;
+                int count = 0;
+                char *extension = ".c";
+                char *dir_name;
+                strcpy(dir_name, path);
+                struct stat buf;
+                char absolute_path[1024];
+
+                //get absolute path
+                 if (stat(path, &buf) == 0) {
+                    if (S_ISDIR(buf.st_mode)) {
+                        printf("%s is a directory\n", path);
+                    } else {
+                        printf("%s is a file\n", path);
+                    }
+                    if (realpath(path, absolute_path) == NULL) {
+                        perror("realpath");
+                        return 1;
+                    }
+                    printf("Absolute path: %s\n", absolute_path);
+                } else {
+                    perror("stat");
+                    return 1;
+                }
+
+                if ((dir = opendir(dir_name)) != NULL) {
+                    while ((ent = readdir(dir)) != NULL) {
+                        if (ent->d_type == DT_REG) {
+                            char *file_ext = strrchr(ent->d_name, '.');
+                            if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
+                                count++;
+                            }
+                        }
+                    }
+                    closedir(dir);
+                    printf("Number of .c files in %s: %d\n", dir_name, count);
+                } else {
+                    perror("Could not open directory");
+                    return 1;
+                }
+
+            }
+        }
+    }
+    else {
+        printf("\n\nERROR. Input not right.\n");
+    }
+
+    printf("\n\n-----------------------------------------------\n\n");
+}
+
 int main(int argc, char **argv) {
 
     if(argc > 1) {
@@ -301,6 +431,7 @@ int main(int argc, char **argv) {
             else if(type == 2) {
                 printf("%s : DIRECTORY\n", argv[i]);
                 printf("\n\n==========================\n\n");
+                handleDirectory(argv[i]);
             }
             else {
                 printf("You didn't enter a regular file/directory/symbolic link");
