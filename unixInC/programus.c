@@ -378,12 +378,10 @@ void handleDirectory(char *path) {
                     }
                     if (realpath(path, absolute_path) == NULL) {
                         perror("realpath");
-                        return 1;
                     }
                     printf("Absolute path: %s\n", absolute_path);
                 } else {
                     perror("stat");
-                    return 1;
                 }
 
                 if ((dir = opendir(dir_name)) != NULL) {
@@ -399,7 +397,6 @@ void handleDirectory(char *path) {
                     printf("Number of .c files in %s: %d\n", dir_name, count);
                 } else {
                     perror("Could not open directory");
-                    return 1;
                 }
 
             }
