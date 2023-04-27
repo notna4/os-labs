@@ -7,6 +7,10 @@
 #include <string.h>
 #include <dirent.h>
 
+#include<sys/stat.h>
+#include<sys/wait.h>
+#include<unistd.h>
+
 int checkFileType(char *path) {
     struct stat buf;
 
@@ -202,6 +206,41 @@ void handleRegular(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
+    //check if file has .c extension
+    //if it has then create child pr
+
+    pid_t pid, w;
+    pid = fork();
+    int wstatus;
+
+    char *extension = ".c";
+    char *file_ext = strrchr(path, '.');
+    if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
+        //file has .c extension
+        if(pid < 0) {
+            printf("error at forking - .c file");
+            exit(1);
+        }
+
+        if(pid == 0) {
+            printf("we are in the child of .c part\n");
+
+                printf("THIS IS A .c FILE!!!!! trying to run\n");
+                execl("bash", "bash", "bash_proc.bash", path, NULL);
+
+            exit(5);
+        }
+        else {
+            if(pid > 0) {
+                printf("parent of .c part\n");
+                w = wait(&wstatus);
+                if(WIFEXITED(wstatus)) {
+                    printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
+                }
+            }
+        }
+    }
+
     if(verifyInput(params, 0) != -1) {
         for(int i = 1; i < strlen(params)-1; i++) {
             if (params[i] == 'n') {
@@ -389,6 +428,7 @@ void handleDirectory(char *path) {
                         if (ent->d_type == DT_REG) {
                             char *file_ext = strrchr(ent->d_name, '.');
                             if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
+                                //file has .c extension
                                 count++;
                             }
                         }
@@ -411,27 +451,50 @@ void handleDirectory(char *path) {
 
 int main(int argc, char **argv) {
 
-    if(argc > 1) {
-        for(int i = 1; i < argc; i++) {
-            int type = checkFileType(argv[i]);
+    pid_t pid, w;
+    pid = fork();
+    int wstatus;
 
-            if(type == 0) {
-                printf("%s : SYMBOLIC LINK\n", argv[i]);
-                printf("\n\n==========================\n\n");
-                handleSym(argv[i]);
+    if(argc > 1) {
+        if(pid < 0) {
+            printf("\nerror at forking\n");
+            exit(1);
+        }
+        if(pid == 0) {
+            printf("\nwe are in a child process\n");
+
+            for(int i = 1; i < argc; i++) {
+                //child pr
+                int type = checkFileType(argv[i]);
+
+                if(type == 0) {
+                    printf("%s : SYMBOLIC LINK\n", argv[i]);
+                    printf("\n\n==========================\n\n");
+                    handleSym(argv[i]);
+                }
+                else if(type == 1) {
+                    printf("%s : REGULAR FILE\n", argv[i]);
+                    printf("\n\n==========================\n\n");
+                    handleRegular(argv[i]);
+                }
+                else if(type == 2) {
+                    printf("%s : DIRECTORY\n", argv[i]);
+                    printf("\n\n==========================\n\n");
+                    handleDirectory(argv[i]);
+                }
+                else {
+                    printf("You didn't enter a regular file/directory/symbolic link");
+                }
             }
-            else if(type == 1) {
-                printf("%s : REGULAR FILE\n", argv[i]);
-                printf("\n\n==========================\n\n");
-                handleRegular(argv[i]);
-            }
-            else if(type == 2) {
-                printf("%s : DIRECTORY\n", argv[i]);
-                printf("\n\n==========================\n\n");
-                handleDirectory(argv[i]);
-            }
-            else {
-                printf("You didn't enter a regular file/directory/symbolic link");
+
+            exit(5);
+        }
+        else {
+            if(pid > 0) {
+                w = wait(&wstatus);
+                if(WIFEXITED(wstatus)) {
+                    printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
+                }
             }
         }
     }
