@@ -5,8 +5,8 @@
 #include<unistd.h>
 
 int main() {
-    pid_t pid, w
-    pid = fork()
+    pid_t id, w;
+    pid = fork();
     int wstatus;
 
     if(pid<0) {

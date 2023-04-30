@@ -223,19 +223,18 @@ void handleRegular(char *path) {
         }
 
         if(pid == 0) {
-            printf("we are in the child of .c part\n");
-
-                printf("THIS IS A .c FILE!!!!! trying to run\n");
-                execl("bash", "bash", "bash_proc.bash", path, NULL);
+            printf("\nBecause this is a regular file with .c extension:\n");
+            printf("Errors \t Warnings\n");
+            execl("/bin/bash", "bash", "bash_proc.bash", path, NULL);
 
             exit(5);
         }
         else {
             if(pid > 0) {
-                printf("parent of .c part\n");
+                // printf("parent of .c part\n");
                 w = wait(&wstatus);
                 if(WIFEXITED(wstatus)) {
-                    printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
+                    printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
                 }
             }
         }
@@ -356,6 +355,40 @@ void handleDirectory(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
+    pid_t pid, w;
+    pid = fork();
+    int wstatus;
+
+    if(pid < 0) {
+        printf("error forking for dir");
+        exit(1);
+    }
+
+    if(pid == 0) {
+        printf("\nBecause this is a directory,\na .txt file will be created with the following name: %s_file.txt\n", path);
+        
+        char *file_name = strcpy(file_name, path);
+        strcat(file_name, "_file.txt");
+        FILE *file_ptr = fopen(file_name, "w");
+        if (file_ptr == NULL) {
+            printf("Error: Unable to create file.\n");
+            exit(-1);
+        }
+        printf("%s_file.txt was created successfully.\n", path);
+        fclose(file_ptr);
+
+        exit(10);
+    }
+    else {
+        if(pid > 0) {
+            // printf("parent of .c part\n");
+            w = wait(&wstatus);
+            if(WIFEXITED(wstatus)) {
+                printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
+            }
+        }
+    }
+
     if(verifyInput(params, 2) != -1) {
         for(int i = 1; i < strlen(params)-1; i++) {
             if (params[i] == 'n') {
@@ -398,7 +431,6 @@ void handleDirectory(char *path) {
             }
 
             if (params[i] == 'c') {
-                
                 DIR *dir;
                 struct dirent *ent;
                 int count = 0;
