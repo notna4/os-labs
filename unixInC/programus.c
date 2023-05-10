@@ -223,9 +223,22 @@ void handleRegular(char *path) {
         }
 
         if(pid == 0) {
+            // i run a bash script to count the number of errors and warnings
             printf("\nBecause this is a regular file with .c extension:\n");
             printf("Errors \t Warnings\n");
             execl("/bin/bash", "bash", "bash_proc.bash", path, NULL);
+
+
+            // // i create a grades.txt file where i will put
+            // // the score based on the number of errors and warnings
+            // char *file_name = strcpy(file_name, "grades.txt");
+            // FILE *file_ptr = fopen(file_name, "w");
+            // if (file_ptr == NULL) {
+            //     printf("Error: Unable to create grades.txt file.\n");
+            //     exit(1);
+            // }
+            // printf("grades.txt was created successfully.\n", path);
+            // fclose(file_ptr);
 
             exit(5);
         }
@@ -238,6 +251,32 @@ void handleRegular(char *path) {
                 }
             }
         }
+    }
+    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {
+        // if the regular file extension is not .c
+        // i should print the number of lines
+
+        if(pid < 0) {
+            printf("error at forking - .c file");
+            exit(1);
+        }
+
+        if(pid == 0) {
+            printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
+            execl("/bin/bash", "bash", "bash_proc_not_c.bash", path, NULL);
+
+            exit(5);
+        }
+        else {
+            if(pid > 0) {
+                // printf("parent of .c part\n");
+                w = wait(&wstatus);
+                if(WIFEXITED(wstatus)) {
+                    printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
+                }
+            }
+        }
+
     }
 
     if(verifyInput(params, 0) != -1) {
@@ -372,7 +411,7 @@ void handleDirectory(char *path) {
         FILE *file_ptr = fopen(file_name, "w");
         if (file_ptr == NULL) {
             printf("Error: Unable to create file.\n");
-            exit(-1);
+            exit(1);
         }
         printf("%s_file.txt was created successfully.\n", path);
         fclose(file_ptr);
