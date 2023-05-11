@@ -206,79 +206,6 @@ void handleRegular(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
-    //check if file has .c extension
-    //if it has then create child pr
-
-    pid_t pid, w;
-    pid = fork();
-    int wstatus;
-
-    char *extension = ".c";
-    char *file_ext = strrchr(path, '.');
-    if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
-        //file has .c extension
-        if(pid < 0) {
-            printf("error at forking - .c file");
-            exit(1);
-        }
-
-        if(pid == 0) {
-            // i run a bash script to count the number of errors and warnings
-            printf("\nBecause this is a regular file with .c extension:\n");
-            printf("Errors \t Warnings\n");
-            execl("/bin/bash", "bash", "bash_proc.bash", path, NULL);
-
-
-            // // i create a grades.txt file where i will put
-            // // the score based on the number of errors and warnings
-            // char *file_name = strcpy(file_name, "grades.txt");
-            // FILE *file_ptr = fopen(file_name, "w");
-            // if (file_ptr == NULL) {
-            //     printf("Error: Unable to create grades.txt file.\n");
-            //     exit(1);
-            // }
-            // printf("grades.txt was created successfully.\n", path);
-            // fclose(file_ptr);
-
-            exit(5);
-        }
-        else {
-            if(pid > 0) {
-                // printf("parent of .c part\n");
-                w = wait(&wstatus);
-                if(WIFEXITED(wstatus)) {
-                    printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
-                }
-            }
-        }
-    }
-    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {
-        // if the regular file extension is not .c
-        // i should print the number of lines
-
-        if(pid < 0) {
-            printf("error at forking - .c file");
-            exit(1);
-        }
-
-        if(pid == 0) {
-            printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
-            execl("/bin/bash", "bash", "bash_proc_not_c.bash", path, NULL);
-
-            exit(5);
-        }
-        else {
-            if(pid > 0) {
-                // printf("parent of .c part\n");
-                w = wait(&wstatus);
-                if(WIFEXITED(wstatus)) {
-                    printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
-                }
-            }
-        }
-
-    }
-
     if(verifyInput(params, 0) != -1) {
         for(int i = 1; i < strlen(params)-1; i++) {
             if (params[i] == 'n') {
@@ -520,54 +447,229 @@ void handleDirectory(char *path) {
     printf("\n\n-----------------------------------------------\n\n");
 }
 
+void handleInputMode(char *argv) {
+    int type = checkFileType(argv);
+
+    if(type == 0) {
+        printf("%s : SYMBOLIC LINK\n", argv);
+        printf("\n\n==========================\n\n");
+        handleSym(argv);
+    }
+    else if(type == 1) {
+        printf("%s : REGULAR FILE\n", argv);
+        printf("\n\n==========================\n\n");
+        handleRegular(argv);
+    }
+    else if(type == 2) {
+        printf("%s : DIRECTORY\n", argv);
+        printf("\n\n==========================\n\n");
+        handleDirectory(argv);
+    }
+    else {
+        printf("You didn't enter a regular file/directory/symbolic link");
+    }
+}
+
+int handleRegularAutomatic(char *argv) {
+
+    //check if file has .c extension
+    //if it has the second child will execute a script
+    //and the output data will be sent to the parent
+    //which will compute a score based on the no. of errors and warnings
+
+    char *extension = ".c";
+    char *file_ext = strrchr(argv, '.');
+    if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
+        //file has .c extension
+
+
+        
+
+
+        // printf("\nBecause this is a regular file with .c extension:\n");
+        // printf("Errors \t Warnings\n");
+        // execl("/bin/bash", "bash", "bash_proc.bash", path, NULL);
+    }
+    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {
+        // if the regular file extension is not .c
+        // i should print the number of lines
+        
+
+        printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
+        execl("/usr/bin/wc", "wc", "-l", argv, NULL);
+
+    }
+
+    return -1;
+
+}
+
+int handleAutomaticMode(char *argv) {
+    int type = checkFileType(argv);
+
+     if(type == 0) {
+        printf("%s : SYMBOLIC LINK\n", argv);
+        printf("\n\n==========================\n\n");
+        handleSym(argv);
+    }
+    else if(type == 1) {
+        printf("%s : REGULAR FILE AUTOMATIC\n", argv);
+        printf("\n\n==========================\n\n");
+        return handleRegularAutomatic(argv);
+    }
+    else if(type == 2) {
+        printf("%s : DIRECTORY\n", argv);
+        printf("\n\n==========================\n\n");
+        handleDirectory(argv);
+    }
+    else {
+        printf("You didn't enter a regular file/directory/symbolic link");
+    }
+}
+
 int main(int argc, char **argv) {
 
-    pid_t pid, w;
-    pid = fork();
-    int wstatus;
+    pid_t pid1, pid2, w;
+    int wstatus1, wstatus2;
+    int fd[2];
+    char buff[1024];
+    
+
+    if(pipe(fd) == -1) {
+        perror("Pipe creation failed.\n");
+        exit(1);
+    }
+
 
     if(argc > 1) {
-        if(pid < 0) {
-            printf("\nerror at forking\n");
-            exit(1);
-        }
-        if(pid == 0) {
-            printf("\nwe are in a child process\n");
+        for(int i = 1; i < argc; i++) {
+            // for each argument we create 2 processes
 
-            for(int i = 1; i < argc; i++) {
-                //child pr
+            pid1 = fork();
+            if(pid1 == 0) {
+
+                handleInputMode(argv[i]);
+
+                exit(0);
+            }
+
+            pid2 = fork();
+            if(pid2 == 0) {
+
                 int type = checkFileType(argv[i]);
 
                 if(type == 0) {
-                    printf("%s : SYMBOLIC LINK\n", argv[i]);
-                    printf("\n\n==========================\n\n");
-                    handleSym(argv[i]);
+                    // sym
                 }
                 else if(type == 1) {
-                    printf("%s : REGULAR FILE\n", argv[i]);
-                    printf("\n\n==========================\n\n");
-                    handleRegular(argv[i]);
-                }
-                else if(type == 2) {
-                    printf("%s : DIRECTORY\n", argv[i]);
-                    printf("\n\n==========================\n\n");
-                    handleDirectory(argv[i]);
+                    // regular file
+
+                    char *extension = ".c";
+                    char *file_ext = strrchr(argv[i], '.');
+                    if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
+                        //file has .c extension
+
+                        close(fd[0]);
+                        dup2(fd[1], 1);
+                    
+                    //   close(fd[1]);
+                        execlp("bash", "bash", "bash_proc.bash", argv[i], NULL);
+                        // error handling here TODO
+                    }
+                    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {    
+                        // if the regular file extension is not .c
+                        // i should print the number of lines
+                        
+
+                        printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
+                        execl("/usr/bin/wc", "wc", "-l", argv[i], NULL);
+                        // error handling here TODO
+
+                    }
+
+
                 }
                 else {
-                    printf("You didn't enter a regular file/directory/symbolic link");
+                    // directory
                 }
+
+                
+
+                exit(0);
             }
 
-            exit(5);
-        }
-        else {
-            if(pid > 0) {
-                w = wait(&wstatus);
-                if(WIFEXITED(wstatus)) {
-                    printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
-                }
+            waitpid(pid1, &wstatus1, 0);
+            if(WIFEXITED(wstatus1)) {
+                printf("Child process exited with status %d\n", WEXITSTATUS(wstatus1));
             }
+
+
+            waitpid(pid2, &wstatus2, 0);
+            if (WIFEXITED(wstatus2)) {
+
+                int bytes_read;
+
+                // Read from the pipe
+                bytes_read = read(fd[0], buff, sizeof(buff));
+
+                // Check for errors
+                if (bytes_read < 0) {
+                    perror("Error reading from pipe");
+                    exit(EXIT_FAILURE);
+                }
+
+                char output[1024];
+                // Print the output
+                printf("Output from child process:\n");
+                // printf("%.*s", bytes_read, buff);
+                strcpy(output, buff);
+
+                // while(read(fd[0], buffer, sizeof(buffer)) > 0) {
+                //     strcpy(output, buffer);
+                // }
+
+                printf("da: %d\n", atoi(&output[0]));
+
+                // for(int i = 0; i < strlen(output); i++) {
+                //     printf("%s\n", output[i]);
+                // }
+
+                printf("Child process exited with status %d\n", WEXITSTATUS(wstatus2));
+
+            }
+        
         }
     }
+
+
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+// if(pid < 0) {
+//     printf("\nerror at forking\n");
+//     exit(1);
+// }
+// if(pid == 0) {
+//     printf("\nwe are in a child process\n");
+
+    
+
+//     exit(5);
+// }
+// else {
+//     if(pid > 0) {
+//         w = wait(&wstatus);
+//         if(WIFEXITED(wstatus)) {
+//             printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
+//         }
+//     }
+// }
