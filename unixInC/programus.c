@@ -11,6 +11,13 @@
 #include<sys/wait.h>
 #include<unistd.h>
 
+pid_t pid1, pid2, w;
+int wstatus1, wstatus2;
+int fd[2];
+char buff[1024];
+
+int cond = 0;
+
 int checkFileType(char *path) {
     struct stat buf;
 
@@ -321,40 +328,6 @@ void handleDirectory(char *path) {
     printf("STANDARD INPUT: ");
     fgets(params, 10, stdin);
 
-    pid_t pid, w;
-    pid = fork();
-    int wstatus;
-
-    if(pid < 0) {
-        printf("error forking for dir");
-        exit(1);
-    }
-
-    if(pid == 0) {
-        printf("\nBecause this is a directory,\na .txt file will be created with the following name: %s_file.txt\n", path);
-        
-        char *file_name = strcpy(file_name, path);
-        strcat(file_name, "_file.txt");
-        FILE *file_ptr = fopen(file_name, "w");
-        if (file_ptr == NULL) {
-            printf("Error: Unable to create file.\n");
-            exit(1);
-        }
-        printf("%s_file.txt was created successfully.\n", path);
-        fclose(file_ptr);
-
-        exit(10);
-    }
-    else {
-        if(pid > 0) {
-            // printf("parent of .c part\n");
-            w = wait(&wstatus);
-            if(WIFEXITED(wstatus)) {
-                printf("process with pid %d, exited, status = %d\n\n", w, WEXITSTATUS(wstatus));
-            }
-        }
-    }
-
     if(verifyInput(params, 2) != -1) {
         for(int i = 1; i < strlen(params)-1; i++) {
             if (params[i] == 'n') {
@@ -397,17 +370,18 @@ void handleDirectory(char *path) {
             }
 
             if (params[i] == 'c') {
+                printf("fisiere c in dir\n");
                 DIR *dir;
                 struct dirent *ent;
                 int count = 0;
                 char *extension = ".c";
-                char *dir_name;
+                char dir_name[1024];
                 strcpy(dir_name, path);
                 struct stat buf;
                 char absolute_path[1024];
 
                 //get absolute path
-                 if (stat(path, &buf) == 0) {
+                if (stat(path, &buf) == 0) {
                     if (S_ISDIR(buf.st_mode)) {
                         printf("%s is a directory\n", path);
                     } else {
@@ -451,95 +425,133 @@ void handleInputMode(char *argv) {
     int type = checkFileType(argv);
 
     if(type == 0) {
+        printf("\n\n==========================\n\n");
         printf("%s : SYMBOLIC LINK\n", argv);
         printf("\n\n==========================\n\n");
         handleSym(argv);
     }
     else if(type == 1) {
+        printf("\n\n==========================\n\n");
         printf("%s : REGULAR FILE\n", argv);
         printf("\n\n==========================\n\n");
         handleRegular(argv);
     }
     else if(type == 2) {
+        printf("\n\n==========================\n\n");
         printf("%s : DIRECTORY\n", argv);
         printf("\n\n==========================\n\n");
         handleDirectory(argv);
     }
     else {
-        printf("You didn't enter a regular file/directory/symbolic link");
+        printf("\n\n?????????????????????\n\n");
+        printf("\nYou didn't enter a regular file/directory/symbolic link.\n");
+        printf("\n\n?????????????????????\n\n");
     }
 }
 
-int handleRegularAutomatic(char *argv) {
+void handleAutoSym(char *argv) {
+    printf("Because this is a symlink, the target file permission will be changed.\n");
+    execl("/bin/chmod", "chmod", "u=rwx,g=rw,o=", argv, NULL);
+    perror("Failed to execute command");
+    exit(EXIT_FAILURE);
+}
 
-    //check if file has .c extension
-    //if it has the second child will execute a script
-    //and the output data will be sent to the parent
-    //which will compute a score based on the no. of errors and warnings
-
+void handleAutoRegularFile(char *argv) {
     char *extension = ".c";
     char *file_ext = strrchr(argv, '.');
     if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
         //file has .c extension
-
-
+        cond = 1;
+        // printf("c: %d\n", *cond);
+        printf("\n**************************\n");
+        printf("\n~~ file has .c extension ~~\n");
+        printf("\n**************************\n");
         
 
-
-        // printf("\nBecause this is a regular file with .c extension:\n");
-        // printf("Errors \t Warnings\n");
-        // execl("/bin/bash", "bash", "bash_proc.bash", path, NULL);
+        close(fd[0]);
+        dup2(fd[1], 1);
+    
+    //   close(fd[1]);
+        execlp("bash", "bash", "bash_proc.bash", argv, NULL);
+        // error handling here TODO
+        perror("Failed to execute command");
+        exit(EXIT_FAILURE);
+        
     }
-    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {
+    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {    
         // if the regular file extension is not .c
         // i should print the number of lines
+        printf("\n**************************\n");
+        printf("\n~~ file does not have .c extension ~~\n");
+        printf("\n**************************\n");
         
 
-        printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
+        printf("\n~~ Because this is a regular file that does not have a .c extension,\n~~ we print the number of lines\n");
         execl("/usr/bin/wc", "wc", "-l", argv, NULL);
-
+        // error handling here TODO
+        perror("Failed to execute command");
+        exit(EXIT_FAILURE);
     }
-
-    return -1;
-
 }
 
-int handleAutomaticMode(char *argv) {
+void handleAutoDirectory(char *argv) {
+    char path[256];
+    strcpy(path, argv);
+
+    printf("%s\n", path);
+    
+    printf("\n~~ Because this is a directory,\n~~ a .txt file will be created with the following name: %s_file.txt\n", path);
+        
+    strcat(path, "_file.txt");
+    FILE *file_ptr = fopen(path, "w");
+    if (file_ptr == NULL) {
+        printf("Error: Unable to create file.\n");
+        exit(1);
+    }
+    printf("\n~~ The %s was created successfully.\n", path);
+    fclose(file_ptr);
+}
+
+void handleAutomaticMode(char *argv) {
     int type = checkFileType(argv);
 
-     if(type == 0) {
-        printf("%s : SYMBOLIC LINK\n", argv);
-        printf("\n\n==========================\n\n");
-        handleSym(argv);
+    if(type == 0) {
+        printf("\n\n**************************\n\n");
+        printf("%s : AUTO SYMBOLIC LINK\n", argv);
+        printf("\n\n**************************\n\n");
+
+        handleAutoSym(argv);
+
     }
     else if(type == 1) {
-        printf("%s : REGULAR FILE AUTOMATIC\n", argv);
-        printf("\n\n==========================\n\n");
-        return handleRegularAutomatic(argv);
+        printf("\n\n**************************\n\n");
+        printf("%s : AUTO REGULAR FILE\n", argv);
+        printf("\n\n**************************\n\n");
+
+        handleAutoRegularFile(argv);
+
     }
-    else if(type == 2) {
-        printf("%s : DIRECTORY\n", argv);
-        printf("\n\n==========================\n\n");
-        handleDirectory(argv);
+    else if(type == 2){
+        printf("\n\n**************************\n\n");
+        printf("%s : AUTO DIRECTORY\n", argv);
+        printf("\n\n**************************\n\n");
+
+        handleAutoDirectory(argv);
+        
     }
     else {
-        printf("You didn't enter a regular file/directory/symbolic link");
+        printf("\n\n?????????????????????\n\n");
+        printf("\nYou didn't enter a regular file/directory/symbolic link.\n");
+        printf("\n\n?????????????????????\n\n");
     }
 }
 
 int main(int argc, char **argv) {
 
-    pid_t pid1, pid2, w;
-    int wstatus1, wstatus2;
-    int fd[2];
-    char buff[1024];
-    
-
     if(pipe(fd) == -1) {
         perror("Pipe creation failed.\n");
         exit(1);
     }
-
 
     if(argc > 1) {
         for(int i = 1; i < argc; i++) {
@@ -555,86 +567,84 @@ int main(int argc, char **argv) {
 
             pid2 = fork();
             if(pid2 == 0) {
-
-                int type = checkFileType(argv[i]);
-
-                if(type == 0) {
-                    // sym
-                }
-                else if(type == 1) {
-                    // regular file
-
-                    char *extension = ".c";
-                    char *file_ext = strrchr(argv[i], '.');
-                    if (file_ext != NULL && strcmp(file_ext, extension) == 0) {
-                        //file has .c extension
-
-                        close(fd[0]);
-                        dup2(fd[1], 1);
-                    
-                    //   close(fd[1]);
-                        execlp("bash", "bash", "bash_proc.bash", argv[i], NULL);
-                        // error handling here TODO
-                    }
-                    else if (file_ext != NULL && strcmp(file_ext, extension) != 0) {    
-                        // if the regular file extension is not .c
-                        // i should print the number of lines
-                        
-
-                        printf("\nBecause this is a regular file that does not have a .c extension,\nwe print the number of lines\n");
-                        execl("/usr/bin/wc", "wc", "-l", argv[i], NULL);
-                        // error handling here TODO
-
-                    }
-
-
-                }
-                else {
-                    // directory
-                }
-
                 
-
+                handleAutomaticMode(argv[i]);
+                
                 exit(0);
             }
 
             waitpid(pid1, &wstatus1, 0);
             if(WIFEXITED(wstatus1)) {
-                printf("Child process exited with status %d\n", WEXITSTATUS(wstatus1));
+                printf("The process with PID %d has ended with the exit code %d.\n", pid1, WEXITSTATUS(wstatus1));
             }
 
 
             waitpid(pid2, &wstatus2, 0);
             if (WIFEXITED(wstatus2)) {
+                // printf("c: %d\n", cond);
+                if(cond) {
+                    int bytes_read;
 
-                int bytes_read;
+                    // Read from the pipe
+                    bytes_read = read(fd[0], buff, sizeof(buff));
 
-                // Read from the pipe
-                bytes_read = read(fd[0], buff, sizeof(buff));
+                    // Check for errors
+                    if (bytes_read < 0) {
+                        perror("Error reading from pipe");
+                        exit(EXIT_FAILURE);
+                    }
 
-                // Check for errors
-                if (bytes_read < 0) {
-                    perror("Error reading from pipe");
-                    exit(EXIT_FAILURE);
+                    char output[1024];
+                    // Print the output
+                    printf("Output from child process:\n");
+                    // printf("%.*s", bytes_read, buff);
+                    strcpy(output, buff);
+
+                    char *token;
+                    // Extract the first number before the comma for warnings
+                    token = strtok(output, ",");
+                    int n_warnings = atoi(token);
+                    // Extract the second number after the comma for errors
+                    token = strtok(NULL, ",");
+                    int n_errors = atoi(token);
+
+                    //get the file name
+                    token = strtok(NULL, ",");
+                    char n_file[256];
+                    strcpy(n_file, token);
+                    strcat(n_file, "\0");
+
+                    printf("W: %d\t E: %d\t F: %s\n", n_warnings, n_errors, n_file);
+
+                    int score = 0;
+
+                    if(n_errors == 0 && n_warnings == 0) {
+                        score = 10;
+                    }
+                    else if(n_errors > 0) {
+                        score = 1;
+                    }
+                    else if(n_errors == 0 && n_warnings > 10) {
+                        score = 2;
+                    }
+                    else if(n_errors == 0 && n_warnings <= 10) {
+                        score = 2 + 8 * (10 - n_warnings)/10;
+                    }
+
+
+                    int file_descriptor = open("grades.txt", O_WRONLY | O_CREAT, 0644);
+                    if (file_descriptor == -1) {
+                        printf("Failed to open grades.txt for writing.\n");
+                        exit(1);
+                    }
+                    dprintf(file_descriptor, "%s: %d", n_file, score);
+                    printf("\n~~ Score written inside grades.txt\n");
+
+                    close(file_descriptor);
+
                 }
 
-                char output[1024];
-                // Print the output
-                printf("Output from child process:\n");
-                // printf("%.*s", bytes_read, buff);
-                strcpy(output, buff);
-
-                // while(read(fd[0], buffer, sizeof(buffer)) > 0) {
-                //     strcpy(output, buffer);
-                // }
-
-                printf("da: %d\n", atoi(&output[0]));
-
-                // for(int i = 0; i < strlen(output); i++) {
-                //     printf("%s\n", output[i]);
-                // }
-
-                printf("Child process exited with status %d\n", WEXITSTATUS(wstatus2));
+                printf("The process with PID %d has ended with the exit code %d.\n", pid2, WEXITSTATUS(wstatus2));
 
             }
         
@@ -644,32 +654,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-// if(pid < 0) {
-//     printf("\nerror at forking\n");
-//     exit(1);
-// }
-// if(pid == 0) {
-//     printf("\nwe are in a child process\n");
-
-    
-
-//     exit(5);
-// }
-// else {
-//     if(pid > 0) {
-//         w = wait(&wstatus);
-//         if(WIFEXITED(wstatus)) {
-//             printf("process with pid %d, exited, status = %d\n", w, WEXITSTATUS(wstatus));
-//         }
-//     }
-// }
